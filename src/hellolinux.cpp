@@ -15,18 +15,19 @@ using namespace std;
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <errno.h>
-#include "../fyslib/sysutils.h"
+#include "fyslib/sysutils.h"
 #include <unistd.h>
-#include "../fyslib/tthread.h"
-#include "../fyslib/AutoObject.hpp"
-#include "../fyslib/systemtime.h"
+#include "fyslib/tthread.h"
+#include "fyslib/AutoObject.hpp"
+#include "fyslib/systemtime.h"
+#include "fyslib/xdaemon.h"
 #include <time.h>
-#include "../fyslib/pandc.hpp"
-#include "../fyslib/xtimer.h"
-#include "../fyslib/xconfig.h"
-#include "../fyslib/threadpool.h"
-#include "../fyslib/xlog.h"
-#include "../fyslib/xdaemon.h"
+#include "fyslib/pandc.hpp"
+#include "fyslib/xtimer.h"
+#include "fyslib/xconfig.h"
+#include "fyslib/threadpool.h"
+#include "fyslib/xlog.h"
+#include "fyslib/xdaemon.h"
 #include <mysql_connection.h>
 #include <cppconn/driver.h>
 #include <cppconn/exception.h>
@@ -35,11 +36,11 @@ using namespace std;
 #include <cppconn/prepared_statement.h>
 #include <memory>
 #include <semaphore.h>
-#include "../fyshttp/xio.h"
-#include "../fyshttp/xsocketutils.h"
-#include "../fyshttp/xserver.h"
-#include "../fyshttp/xserver_consts.h"
-#include "../fyshttp/xio.h"
+#include "fyshttp/xio.h"
+#include "fyshttp/xsocketutils.h"
+#include "fyshttp/xserver.h"
+#include "fyshttp/xserver_consts.h"
+#include "fyshttp/xio.h"
 
 #ifndef _GLIBCXX_USE_WCHAR_T
 #define _GLIBCXX_USE_WCHAR_T
@@ -53,8 +54,7 @@ class MyThrd: public TThread
 {
 public:
 	void Set(Pandc<int> *p)
-	{
-		m_p = p;
+	{		m_p = p;
 	}
 protected:
 	Pandc<int> *m_p;
@@ -200,12 +200,47 @@ void myHttpHandle(const XHttpRequest *req,/*out*/XHttpResponse *res)
 	return;
 }
 
+struct Base{
+	virtual void setI(const int v){
+		cout<<"Base::SetI()"<<endl;
+	}
+};
+
+struct Item: Base{
+	virtual void setI(const int v){
+		cout<<"Item::setI()"<<endl;
+	}
+};
+
+
 int main(int argc,char *argv[])
 {
+	{
+		ForwardBuffer buf;
+		cout<<buf.GetCapacity()<<endl;
+		cout<<buf.GetSize()<<endl;
+		string s = "hello world!";
+		buf.Write(s.c_str(),s.length()+1);
+		cout<<buf.GetCapacity()<<endl;
+		cout<<buf.GetSize()<<endl;
+		char s1[100];
+		cout <<buf.Read(s1,100)<<endl;
+		cout<<s1<<endl;
+		return 0;
+	}
+	{
+		cout<<"press any key to exit.";
+		cin.get();
+		return 0;
+	}
+	Base *a = new Item();
+	a->setI(1);
 
+	return 0;
 	//xserver
 	{
 		daemonize();
+		cout<< "asdf"<<endl;
 		XServer *svr = new XServer("/root/http.cfg");
 		svr->RegisterHandler("/",myHttpHandle);
 		svr->Start();
