@@ -10,6 +10,8 @@
 #include <string.h>
 #include <string>
 #include <vector>
+#include <stdlib.h>
+#include <pthread.h>
 using namespace std;
 
 namespace fyslib
@@ -224,6 +226,33 @@ private:
 	long m_pos;
 	long m_capacity;
 	long m_init_capacity;
+};
+
+class ForwardBuffer
+{
+public:
+	ForwardBuffer();
+	virtual ~ForwardBuffer();
+
+	POINTER Read(void *dest, POINTER bytes);
+	bool Write(const void *from, POINTER bytes);
+	POINTER GetSize(){
+		return m_size;
+	}
+	POINTER GetCapacity(){
+		return m_capacity;
+	}
+	void Grow(POINTER bytes);
+	void Reset();
+private:
+	ForwardBuffer(const ForwardBuffer&);
+	ForwardBuffer& operator=(const ForwardBuffer&);
+private:
+	void *m_buffer;
+	POINTER m_size;
+	POINTER m_pos;
+	POINTER m_capacity;
+	pthread_mutex_t *m_lock;
 };
 
 }

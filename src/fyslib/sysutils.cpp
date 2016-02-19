@@ -19,6 +19,8 @@
 #include <stdarg.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <pthread.h>
+#include "tthread.h"
 
 using namespace std;
 
@@ -1123,6 +1125,58 @@ bool MemoryStream::Shrink(long new_size)
 	if (m_pos >= m_size)
 		m_pos = m_size - 1;
 	return true;
+}
+
+ForwardBuffer::ForwardBuffer(){
+	m_buffer = NULL;
+	m_size = 0;
+	m_pos = 0;
+	m_capacity = 0;
+	m_lock = CreateMutex(true);
+}
+ForwardBuffer::~ForwardBuffer(){
+	if (m_buffer)
+		free(m_buffer);
+	DestroyMutex(m_lock);
+}
+
+POINTER ForwardBuffer::Read(void *dest, POINTER bytes){
+	AutoMutex auto1(m_lock);
+	if (m_buffer == NULL || m_size <= 0)
+		return 0;
+	long n = bytes;
+	if (m_size < bytes){
+		n = m_size;
+	}
+	memcpy(dest,AddPtr(m_buffer,m_pos),n);
+	m_pos += n;
+	m_size -= n;
+	return n;
+}
+bool ForwardBuffer::Write(const void *from, POINTER bytes){
+	AutoMutex auto1(m_lock);
+	POINTER n = m_capacity - m_pos - m_size;
+	if (n < bytes){
+		Grow(bytes);
+	}
+	memcpy(AddPtr(m_buffer,m_pos + m_size),from,bytes);
+	m_size += bytes;
+}
+void ForwardBuffer::Grow(POINTER bytes){
+	AutoMutex auto1(m_lock);
+	POINTER n = m_capacity - m_pos + bytes;
+	void *mem = malloc((size_t)n);
+	if (m_buffer && m_size > 0){
+		memcpy(mem,AddPtr(m_buffer,m_pos),m_size);
+		free(m_buffer);
+	}
+	m_pos = 0;
+	m_capacity = n;
+	m_buffer = mem;
+}
+void ForwardBuffer::Reset(){
+	m_size = 0;
+	m_pos = 0;
 }
 
 }
