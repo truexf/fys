@@ -44,7 +44,7 @@ class ObjFuncClass0: public BaseFuncClass
 {
 public:
   ObjFuncClass0(OBJTYPE *obj,FUNCTYPE func){m_func = func;m_obj = obj;}
-  void ExecFunc(){if (m_func && m_obj) m_obj->*m_func();}
+  void ExecFunc(){if (m_func && m_obj) (m_obj->*m_func)();}
 private:
   FUNCTYPE m_func;
   OBJTYPE *m_obj;

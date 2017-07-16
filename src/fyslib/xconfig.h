@@ -25,15 +25,20 @@ public:
 	virtual ~XConfig();
 
 	bool LoadFromFile(const string &file);
+	bool LoadFromString(const string cfg);
+	void Reload();
 	bool SaveToFile(const string &file);
 	string Get(const string section,const string ident,string default_value);
 	void Set(const string section,const string ident,const string value);
+	int GetInt(const string section,const string ident,int default_value);
+	void SetInt(const string section,const string ident,int value);
 private:
 	XConfig(const XConfig&);
 	XConfig& operator = (const XConfig&);
 
 	map<string,map<string,string>* > m_data;
 	pthread_mutex_t *m_lock;
+	string m_file;
 private:
 	void Clear();
 };

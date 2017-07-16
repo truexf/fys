@@ -13,8 +13,32 @@
 #include "AutoObject.hpp"
 #include "systemtime.h"
 #include <stdlib.h>
+#include <stdarg.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <stdio.h>
 
 namespace fyslib{
+
+const char* FormatLog(XLog *log,const char * str, ...)
+{
+	AutoMutex auto1(log->m_logfmt_lock) ;
+	if (str != NULL)
+	{
+		va_list vl;
+		va_start(vl, str);
+		int n = vsnprintf(log->m_logfmt, sizeof(log->m_logfmt), str, vl);
+		va_end(vl);
+		if (n > 0)
+		{
+			log->m_logfmt[n] = 0;
+			return log->m_logfmt;
+		}
+	}
+	return "";
+}
+
+XLog *_log = NULL;
 
 typedef unsigned long DWORD;
 
@@ -57,6 +81,9 @@ XLog::XLog(const char *p_logfilenamepath,
   memset(s,0,255);
   gethostname(s,255);
   memcpy(m_computer_name,s,strlen(s));
+  _log = this;
+  memset(m_logfmt,0,sizeof(m_logfmt));
+  m_logfmt_lock = CreateMutex(false);
 }
 
 XLog::~XLog()
@@ -145,37 +172,50 @@ void XLog::SwitchQueue()
   m_prequeue_size = 0;
 }
 
-void XLog::LogWarn(const  char *data )
+void XLog::LogWarn(const  char *data,bool newLine )
 {
   SYSTEMTIME st;
   GetLocalTime(&st);
-  string s = FormatDatetime(st) + " warn " +  string(data) + "\r\n";
+  string s = FormatDatetime(st) + " warn " +  string(data);
+  if (newLine)
+	  s += "\r\n";
   Log(s.c_str(),s.length()*sizeof(char));
 }
 
-void XLog::LogError(const char *data )
+void XLog::LogError(const char *data,bool newLine )
 {
   SYSTEMTIME st;
   GetLocalTime(&st);
-  string s = FormatDatetime(st) + " error " + string(data) + "\r\n";
+  string s = FormatDatetime(st) + " error " + string(data);
+  if (newLine)
+	  s += "\r\n";
   Log(s.c_str(),s.length()*sizeof(char));
 }
 
-void XLog::LogInfo(const  char *data )
+void XLog::LogInfo(const  char *data,bool newLine )
 {
   SYSTEMTIME st;
   GetLocalTime(&st);
-  string s = FormatDatetime(st) + " info " + string(data) + "\r\n";
+  string s = FormatDatetime(st) + " info " + string(data);
+  if (newLine)
+	  s += "\r\n";
   Log(s.c_str(),s.length()*sizeof(char));
 }
 
-void XLog::LogDebug(const char *data )
+void XLog::LogDebug(const char *data,bool newLine )
 {
   SYSTEMTIME st;
   GetLocalTime(&st);
-  string s = FormatDatetime(st) + " debug " + string(data) + "\r\n";
+  string s = FormatDatetime(st) + " debug " + string(data);
+  if (newLine)
+	  s += "\r\n";
+  Log(s.c_str(),s.length()*sizeof(char));
 }
 
+void XLog::LogStr(const char *str)
+{
+	Log(str,strlen(str));
+}
 
 
 

@@ -1,12 +1,12 @@
 /*
- * xsocket.h
+ * xsocketutils.hpp
  *
- *  Created on: Mar 25, 2015
+ *  Created on: Apr 17, 2016
  *      Author: root
  */
 
-#ifndef FYSHTTP_XSOCKETUTILS_H_
-#define FYSHTTP_XSOCKETUTILS_H_
+#ifndef FYSLIB_XSOCKETUTILS_HPP_
+#define FYSLIB_XSOCKETUTILS_HPP_
 
 #include <unistd.h>
 #include <fcntl.h>
@@ -18,9 +18,6 @@
 #include <netinet/tcp.h>
 #include <arpa/inet.h>
 #include <string.h>
-
-namespace fyshttp
-{
 
 inline int CreateTCPSocket()
 {
@@ -47,9 +44,13 @@ inline int TcpBind(int sockfd, const char *ip, unsigned short port)
 inline void SetSocketKeepalive(int sockfd, int keepalive, int idle_seconds)
 {
 	setsockopt(sockfd, SOL_SOCKET, SO_KEEPALIVE, &keepalive, sizeof(int));
-	if (keepalive)
+	if (keepalive) {
 		setsockopt(sockfd, IPPROTO_TCP, TCP_KEEPIDLE, &idle_seconds,
 				sizeof(int));
+		int intvl = 5;
+        setsockopt(sockfd, IPPROTO_TCP, TCP_KEEPINTVL, &intvl,
+                sizeof(int));
+	}
 }
 
 inline int SetSocketNagle(int sockfd, int nodelay)
@@ -90,9 +91,9 @@ inline int AcceptTimeout(int listensockfd, struct timeval *tv,
 	if (nfds > 0)
 		return accept(listensockfd, addr, addrlen);
 	else
-		return -1;
+		return nfds;
 }
 
-} //end of namespace
 
-#endif /* FYSHTTP_XSOCKETUTILS_H_ */
+
+#endif /* FYSLIB_XSOCKETUTILS_HPP_ */

@@ -4,7 +4,7 @@
 #ifdef __x86_64__
 #define POINTER long long
 #else
-#define POINTER	int
+#define POINTER	long
 #endif
 
 #include <string.h>
@@ -17,6 +17,7 @@ using namespace std;
 namespace fyslib
 {
 
+string GetBacktraceStr(int signo);
 
 inline void IncPtr(void **p, POINTER inc_bytes)
 {
@@ -86,9 +87,13 @@ string& ReplaceStringI(string &s, const string &OldPattern,
 wstring& ReplaceStringIW(wstring &s, const wstring &OldPattern,
 		const wstring &NewPattern, bool bReplaceAll = true);
 string FormatString(const char* str, ...);
+string Fmt(const char* str, ...);
 wstring FormatStringW(const wchar_t* str, ...);
 string FormatStringEx(size_t buf_size, const char* str, ...);
 wstring FormatStringWEx(size_t buf_size, const wchar_t* str, ...);
+string FillString(string s,size_t width,char fillChar,bool fillLeft);
+
+string CreateGUID();
 
 bool FileExists(const char *fn);
 inline bool FileExistsW(const wchar_t *fn)
@@ -138,6 +143,7 @@ inline long GetFileSizeW(const wchar_t *fn)
 {
 	return GetFileSize(w2c(fn).c_str());
 }
+string LoadStringFromFile(const string &file);
 bool LoadBufferFromFile(const string &file,/*outer*/void **buf,/*outer*/
 		size_t &bufsize);
 inline bool LoadBufferFromFileW(const wstring &file,/*outer*/void **buf,/*outer*/
@@ -177,6 +183,14 @@ string ReadBufferIni(const string &AIniData, const string &ASection,
 string ReadBufferIni(const vector<string> &AIniData, const string &ASection,
 		const string &AIdent, const string &ADefaultValue);
 
+void rc4_crypt(unsigned char *key, unsigned long keyLen,unsigned char *data, unsigned long dataLen);
+string rc4_string(string key,string data);
+
+char *base64_encode(const char* data, int data_len,bool urlencode);
+char *base64_decode(const char* data, int data_len,bool urlencode);
+string base64_encode_string(string data,bool urlencode);
+string base64_decode_string(string data,bool urlencode);
+
 class MemoryStream
 {
 public:
@@ -188,8 +202,16 @@ public:
 	virtual ~MemoryStream();
 	long Read(MemoryStream &dest, long bytes);
 	long Read(void *dest, long bytes);
+	string AsString()
+	{
+		return string((char*)GetBuffer(),GetSize());
+	}
 	bool Write(const MemoryStream &from, long bytes = -1);
 	bool Write(const void *from, long bytes);
+	bool WriteString(const string &s)
+	{
+		return Write(s.c_str(),s.length());
+	}
 	long GetSize() const
 	{
 		return m_size;

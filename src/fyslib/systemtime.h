@@ -26,9 +26,10 @@ typedef struct _SYSTEMTIME {
 } SYSTEMTIME, *PSYSTEMTIME, *LPSYSTEMTIME;
 
 void GetLocalTime(SYSTEMTIME *st);
-//以yyyy-mm-dd hh:nn:ss的格式返回一个日期的字符串格式
+//以yyyy-mm-dd hh:nn:ss:zzz的格式返回一个日期的字符串格式
 string FormatDatetime(const SYSTEMTIME &st);
 wstring FormatDatetimeW(const SYSTEMTIME &st);
+string NowStr();
 
 //以yyyy-mm-dd的格式返回一个日期的字符串格式
 string FormatDate(const SYSTEMTIME &st);
@@ -49,6 +50,7 @@ int DaysBetween(SYSTEMTIME &p_now, SYSTEMTIME &p_then);
 int HoursBetween(SYSTEMTIME &p_now, SYSTEMTIME &p_then);
 int MinutesBetween(SYSTEMTIME &p_now, SYSTEMTIME &p_then);
 long long SecondsBetween(SYSTEMTIME &p_now, SYSTEMTIME &p_then);
+long long MillisecondsBetween(SYSTEMTIME &p_now, SYSTEMTIME &p_then);
 void IncYear(SYSTEMTIME &dt,int years);
 void IncMonth(SYSTEMTIME &dt,int months);
 void IncDay(SYSTEMTIME &dt,int days);

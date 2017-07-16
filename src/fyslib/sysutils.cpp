@@ -20,12 +20,37 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <pthread.h>
+#include <uuid/uuid.h>
 #include "tthread.h"
+#include <execinfo.h>
 
 using namespace std;
 
 namespace fyslib
 {
+string GetBacktraceStr(int signo) {
+    string ret(FormatString("signo %d,call stack:\n",signo));
+    void *pTrace[256];
+    char **ppszMsg = NULL;
+    size_t uTraceSize = 0;
+    do {
+        if (0 == (uTraceSize = backtrace(pTrace, sizeof(pTrace) / sizeof(void *)))) {
+            break;
+        }
+        if (NULL == (ppszMsg = backtrace_symbols(pTrace, uTraceSize))) {
+            break;
+        }
+        for (size_t i = 0; i < uTraceSize; ++i) {
+              ret += FormatString("%s\n", ppszMsg[i]);
+        }
+    } while (0);
+
+    if (NULL != ppszMsg) {
+        free(ppszMsg);
+        ppszMsg = NULL;
+    }
+    return ret;
+}
 /*
  string 转换为 wstring
  */
@@ -577,6 +602,12 @@ void GetCommandLineList(vector<string> &lst)
 			return;
 		SplitString(string(scmds, j), string("\0", 1), lst);
 	}
+	char dir[1024] = {0};
+	int n = readlink("/proc/self/exe", dir, 1024);
+	if (n > 0 && lst.size() > 0)
+	{
+		lst[0] = string(dir);
+	}
 }
 
 string ParamStr(size_t i)
@@ -587,7 +618,18 @@ string ParamStr(size_t i)
 		return v[i];
 	return "";
 }
-
+string LoadStringFromFile(const string &file)
+{
+    void *buf = NULL;
+    size_t buf_len = 0;
+    if (LoadBufferFromFile(file,&buf,buf_len)) {
+        string ret((char*)buf,buf_len);
+        free(buf);
+        return ret;
+    } else {
+        return "";
+    }
+}
 bool LoadBufferFromFile(const string &file,/*outer*/void **buf,/*outer*/
 		size_t &bufsize)
 {
@@ -630,7 +672,7 @@ bool SaveBufferToFile(const string &file, void *buf, size_t bufsize)
 		return false;
 	if (NULL == buf || 0 == bufsize)
 		return false;
-	int fd = open(file.c_str(), O_RDWR | O_CREAT | O_TRUNC);
+	int fd = open(file.c_str(), O_RDWR | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
 	if (-1 == fd)
 		return false;
 	long iretain = bufsize;
@@ -780,52 +822,61 @@ bool SimpleMatch(const string &afmt, const string& astr)
 	return true;
 }
 
+string Fmt(const char* str, ...) {
+    string ret = str;
+    if (str != NULL)
+    {
+        char vret[8192] = { 0 };
+        va_list vl;
+        va_start(vl, str);
+        vsnprintf(vret, 8192, str, vl);
+        va_end(vl);
+        return string(vret, strlen(vret));
+    }
+    return "";
+}
 string FormatString(const char * str, ...)
 {
 	string ret = str;
-	if (ret != "")
+	if (str != NULL)
 	{
 		char vret[1024] =
 		{ 0 };
 		va_list vl;
 		va_start(vl, str);
-		vsnprintf(vret, 1024, ret.c_str(), vl);
+		vsnprintf(vret, 1024, str, vl);
 		va_end(vl);
-		ret.assign(vret, strlen(vret));
-		return ret;
+		return string(vret, strlen(vret));
 	}
 	return "";
 }
 
 wstring FormatStringW(const wchar_t *str, ...)
 {
-	wstring ret = str;
-	if (ret != L"")
+	if (str != NULL)
 	{
 		wchar_t vret[1024] =
 		{ 0 };
 		va_list vl;
 		va_start(vl, str);
-		vswprintf(vret, 1024, ret.c_str(), vl);
+		vswprintf(vret, 1024, str, vl);
 		va_end(vl);
-		ret.assign(vret, wcslen(vret));
-		return ret;
+		return wstring(vret, wcslen(vret));
 	}
 	return L"";
 }
 
 string FormatStringEx(size_t buf_size, const char* str, ...)
 {
-	string ret = str;
-	if (ret != "")
+	if (str != NULL)
 	{
 		char *vret = (char*) malloc(buf_size);
 		memset(vret, 0, buf_size);
 		va_list vl;
 		va_start(vl, str);
-		vsnprintf(vret, buf_size, ret.c_str(), vl);
+		vsnprintf(vret, buf_size, str, vl);
 		va_end(vl);
-		ret.assign(vret, strlen(vret));
+		string ret(vret, strlen(vret));
 		::free(vret);
 		return ret;
 	}
@@ -834,20 +885,52 @@ string FormatStringEx(size_t buf_size, const char* str, ...)
 
 wstring FormatStringWEx(size_t buf_size, const wchar_t* str, ...)
 {
-	wstring ret = str;
-	if (ret != L"")
+	if (str != NULL)
 	{
 		wchar_t *vret = (wchar_t*) malloc(buf_size * sizeof(wchar_t));
 		memset(vret, 0, buf_size * sizeof(wchar_t));
 		va_list vl;
 		va_start(vl, str);
-		vswprintf(vret, buf_size, ret.c_str(), vl);
+		vswprintf(vret, buf_size, str, vl);
 		va_end(vl);
-		ret.assign(vret, wcslen(vret));
+		wstring ret(vret, wcslen(vret));
 		::free(vret);
 		return ret;
 	}
 	return L"";
+}
+
+string FillString(string s,size_t width,char fillChar,bool fillLeft)
+{
+	if (width <= s.length())
+		return s;
+	vector<char> v(width,fillChar);
+	if (fillLeft)
+	{
+		size_t j = 0;
+		for(size_t i=width-s.length();i<width;++i)
+		{
+			v[i] = s[j];
+			++j;
+		}
+	}
+	else
+	{
+		for(size_t i = 0;i<s.length();++i)
+		{
+			v[i] = s[i];
+		}
+	}
+	return string((const char*)v.data(),width);
+}
+
+string CreateGUID()
+{
+	 uuid_t uuid;
+	 char str[36];
+	 ::uuid_generate(uuid);
+	 ::uuid_unparse(uuid, str);
+	 return string(str,36);
 }
 
 string BufToHex(unsigned char *buf, unsigned long bufsize)
@@ -959,6 +1042,211 @@ string ReadBufferIni(const vector<string> &AIniData, const string &ASection,
 		}
 	}
 	return ret;
+}
+
+void _rc4_init(unsigned char *s, unsigned char *key, unsigned long Len) //初始化函数
+{
+	int i =0, j = 0;
+	char k[256] = {0};
+	unsigned char tmp = 0;
+	for (i=0;i<256;i++) {
+		s[i] = i;
+		k[i] = key[i%Len];
+	}
+	for (i=0; i<256; i++) {
+		j=(j+s[i]+k[i])%256;
+		tmp = s[i];
+		s[i] = s[j]; //交换s[i]和s[j]
+		s[j] = tmp;
+	}
+}
+
+void _rc4_crypt(unsigned char *s, unsigned char *Data, unsigned long Len) //加解密
+{
+	int i = 0, j = 0, t = 0;
+	unsigned long k = 0;
+	unsigned char tmp;
+	for(k=0;k<Len;k++) {
+		i=(i+1)%256;
+		j=(j+s[i])%256;
+		tmp = s[i];
+		s[i] = s[j]; //交换s[x]和s[y]
+		s[j] = tmp;
+		t=(s[i]+s[j])%256;
+		Data[k] ^= s[t];
+	}
+}
+
+void rc4_crypt(unsigned char *key, unsigned long keyLen,unsigned char *data, unsigned long dataLen)
+{
+	unsigned char s[256] = {0}; //S-box
+	_rc4_init(s,key,keyLen);
+	_rc4_crypt(s,data,dataLen);
+}
+
+string rc4_string(string key,string data)
+{
+	unsigned char *ret = (unsigned char*)malloc(data.length());
+	memcpy(ret,data.c_str(),data.length());
+	rc4_crypt((unsigned char*)key.c_str(),key.length(),ret,data.length());
+	string sret((char*)ret,data.length());
+	free(ret);
+	return sret;
+}
+
+const char base_trad[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=";
+const char base_url[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_=";
+//const char base_url[] = "oMq_rc1fuEbtXgBOkKlIxyzNFYd2Js0D-Tv8495A6iheCpWS3QGUamwVjRH7nLPZ=";
+char *base64_encode(const char* data, int data_len,bool urlencode) {
+	char *base;
+	if (!urlencode)
+		base = (char*)base_trad;
+	else
+		base = (char*)base_url;
+	int prepare = 0;
+	int ret_len;
+	int temp = 0;
+	char *ret = NULL;
+	char *f = NULL;
+	int tmp = 0;
+	char changed[4];
+	int i = 0;
+	ret_len = data_len / 3;
+	temp = data_len % 3;
+	if (temp > 0) {
+		ret_len += 1;
+	}
+	ret_len = ret_len * 4 + 1;
+	ret = (char *) malloc(ret_len);
+	if (ret == NULL) {
+		printf("No enough memory.\n");
+		exit(0);
+	}
+	memset(ret, 0, ret_len);
+	f = ret;
+	while (tmp < data_len) {
+		temp = 0;
+		prepare = 0;
+		memset(changed, '\0', 4);
+		while (temp < 3) {
+//printf("tmp = %d\n", tmp);
+			if (tmp >= data_len) {
+				break;
+			}
+			prepare = ((prepare << 8) | (data[tmp] & 0xFF));
+			tmp++;
+			temp++;
+		}
+		prepare = (prepare << ((3 - temp) * 8));
+//printf("before for : temp = %d, prepare = %d\n", temp, prepare);
+		for (i = 0; i < 4; i++) {
+			if (temp < i) {
+				changed[i] = 0x40;
+			} else {
+				changed[i] = (prepare >> ((3 - i) * 6)) & 0x3F;
+			}
+			*f = base[changed[i]];
+//printf("%.2X", changed[i]);
+			f++;
+		}
+	}
+	*f = '\0';
+	return ret;
+}
+/* */
+static char find_pos(char ch,bool urlencode) {
+	char *base;
+	if (!urlencode)
+		base = (char*)base_trad;
+	else
+		base = (char*)base_url;
+	char *ptr = (char*) strrchr(base, ch); //the last position (the only) in base[]
+	return (ptr - base);
+}
+/* */
+char *base64_decode(const char *data, int data_len,bool urlencode) {
+	char *base;
+	if (!urlencode)
+		base = (char*)base_trad;
+	else
+		base = (char*)base_url;
+	int ret_len = (data_len / 4) * 3;
+	int equal_count = 0;
+	char *ret = NULL;
+	char *f = NULL;
+	int tmp = 0;
+	int temp = 0;
+	char need[3];
+	int prepare = 0;
+	int i = 0;
+	if (*(data + data_len - 1) == '=') {
+		equal_count += 1;
+	}
+	if (*(data + data_len - 2) == '=') {
+		equal_count += 1;
+	}
+	if (*(data + data_len - 3) == '=') { //seems impossible
+		equal_count += 1;
+	}
+	switch (equal_count) {
+	case 0:
+		ret_len += 4; //3 + 1 [1 for NULL]
+		break;
+	case 1:
+		ret_len += 4; //Ceil((6*3)/8)+1
+		break;
+	case 2:
+		ret_len += 3; //Ceil((6*2)/8)+1
+		break;
+	case 3:
+		ret_len += 2; //Ceil((6*1)/8)+1
+		break;
+	}
+	ret = (char *) malloc(ret_len);
+	if (ret == NULL) {
+		printf("No enough memory.\n");
+		exit(0);
+	}
+	memset(ret, 0, ret_len);
+	f = ret;
+	while (tmp < (data_len - equal_count)) {
+		temp = 0;
+		prepare = 0;
+		memset(need, 0, 4);
+		while (temp < 4) {
+			if (tmp >= (data_len - equal_count)) {
+				break;
+			}
+			prepare = (prepare << 6) | (find_pos(data[tmp],urlencode));
+			temp++;
+			tmp++;
+		}
+		prepare = prepare << ((4 - temp) * 6);
+		for (i = 0; i < 3; i++) {
+			if (i == temp) {
+				break;
+			}
+			*f = (char) ((prepare >> ((2 - i) * 8)) & 0xFF);
+			f++;
+		}
+	}
+	*f = '\0';
+	return ret;
+}
+
+string base64_encode_string(string data,bool urlencode)
+{
+	char *ret = base64_encode(data.c_str(),data.length(),urlencode);
+	string sret(ret);
+	free(ret);
+	return sret;
+}
+string base64_decode_string(string data,bool urlencode)
+{
+	char *ret = base64_decode(data.c_str(),data.length(),urlencode);
+	string sret(ret);
+	free(ret);
+	return sret;
 }
 
 MemoryStream::MemoryStream() :
@@ -1161,6 +1449,7 @@ bool ForwardBuffer::Write(const void *from, POINTER bytes){
 	}
 	memcpy(AddPtr(m_buffer,m_pos + m_size),from,bytes);
 	m_size += bytes;
+	return true;
 }
 void ForwardBuffer::Grow(POINTER bytes){
 	AutoMutex auto1(m_lock);
@@ -1180,3 +1469,4 @@ void ForwardBuffer::Reset(){
 }
 
 }
+

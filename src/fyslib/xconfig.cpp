@@ -35,15 +35,17 @@ void XConfig::Clear()
 	m_data.clear();
 }
 
-bool XConfig::LoadFromFile(const string &file)
+void XConfig::Reload()
 {
-	AutoMutex auto1(m_lock);
-	void *buf=NULL;
-	size_t buf_size = 0;
-	if (!LoadBufferFromFile(file,&buf,buf_size))
+	LoadFromFile(m_file);
+}
+bool XConfig::LoadFromString(const string cfg)
+{
+	if (cfg.empty())
 		return false;
+	AutoMutex auto1(m_lock);
 	Clear();
-	string s((char*)buf,buf_size);
+	string s(cfg);
 	vector<string> v;
 	SplitString(s,"",v);
 	for(size_t i=0;i<v.size();++i)
@@ -81,6 +83,21 @@ bool XConfig::LoadFromFile(const string &file)
 		}
 	}
 	return true;
+}
+bool XConfig::LoadFromFile(const string &file)
+{
+	void *buf=NULL;
+	size_t buf_size = 0;
+	if (!LoadBufferFromFile(file,&buf,buf_size))
+		return false;
+	string s((char*)buf,buf_size);
+	free(buf);
+	if (LoadFromString(s)) {
+		m_file = file;
+		return true;
+	} else {
+		return false;
+	}
 }
 
 
@@ -132,6 +149,23 @@ void XConfig::Set(const string section,const string ident,const string value)
 	}
 	map<string,string> *sec = it->second;
 	(*sec)[ident] = value;
+}
+
+int XConfig::GetInt(const string section,const string ident,int default_value)
+{
+	string s(this->Get(section,ident,""));
+	if (s.empty())
+		return default_value;
+	else
+	{
+		return atoi(s.c_str());
+	}
+}
+
+void XConfig::SetInt(const string section,const string ident,int value)
+{
+	string s = Int2Str(value);
+	this->Set(section,ident,s);
 }
 
 

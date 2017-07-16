@@ -32,6 +32,13 @@ string FormatDatetime(const SYSTEMTIME &st)
   return string(cst);
 }
 
+string NowStr()
+{
+	SYSTEMTIME st;
+	GetLocalTime(&st);
+	return FormatDatetime(st);
+}
+
 string FormatDate(const SYSTEMTIME &st)
 {
   char cst[30]={0};
@@ -233,7 +240,12 @@ int MinutesBetween( SYSTEMTIME &p_now, SYSTEMTIME &p_then )
 
 long long SecondsBetween( SYSTEMTIME &p_now, SYSTEMTIME &p_then )
 {
-  return MinutesBetween(p_now,p_then)*60+(p_then.wMinute-p_now.wMinute);
+	return MinutesBetween(p_now,p_then)*60+(p_then.wSecond-p_now.wSecond);
+}
+
+long long MillisecondsBetween(SYSTEMTIME &p_now, SYSTEMTIME &p_then)
+{
+	return SecondsBetween(p_now,p_then)*1000 + (p_then.wMilliseconds - p_now.wMilliseconds);
 }
 
 inline void IncYear( SYSTEMTIME &dt,int years )
