@@ -98,11 +98,12 @@ private:
 class UnixSocketServer: public TThread
 {
 public:
-    UnixSocketServer(): m_on_error(NULL), m_on_connected(NULL) {
+    UnixSocketServer(): m_socket(-1), m_on_connected(NULL), m_on_error(NULL) {
     }
     void SetEventHandle(OnUxSocketError onErr, OnUxSocketConnected onConn){
         m_on_error = onErr;
         m_on_connected = onConn;
+        m_socket = -1;
     }
     bool StartListen(const char* unixFn);
 protected:
@@ -112,8 +113,8 @@ private:
     UnixSocketServer& operator = (const UnixSocketServer&);
 
     int m_socket;
-    OnUxSocketError m_on_error;
     OnUxSocketConnected m_on_connected;
+    OnUxSocketError m_on_error;
 };
 
 }
